@@ -1,9 +1,12 @@
 Package: JamachineLearning
 Type: Package
-Title: What the package does (short line)
-Version: 1.0
-Date: 2015-06-06
-Author: Who wrote it
-Maintainer: Who to complain to <yourfault@somewhere.net>
-Description: More about what it does (maybe more than one line)
-License: What license is it under?
+Title: What the Package Does (Title Case)
+Version: 0.1
+Date: 2015-07-12
+Author: Jamamel
+Maintainer: Jamamel <jamamel@gmail.com>
+Description: bla bla bla bla bla bla bla bla bla bla bla.
+License: GPL-2
+LazyData: TRUE
+Depends: R (>= 3.2.1), data.table, magrittr
+Imports: lubridate, caret
