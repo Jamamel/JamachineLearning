@@ -1,0 +1,137 @@
+---
+title: "JamachineLearning Project Writeup"
+author: "Jamamel"
+date: "22 July 2015"
+output: 
+  html_document: 
+    keep_md: yes
+    number_sections: yes
+    toc: yes
+---
+
+# Introduction
+
+This document is the final submission that describes construction of a machine learning algorithm to predict the manner of excercise being performed by several project participants.
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website [here](http://groupware.les.inf.puc-rio.br/har]) (see the section on the Weight Lifting Exercise Dataset). 
+
+## Data 
+
+The training data for this project are available [here](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv).
+
+The test data are available [here](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv).
+
+The data for this project come from this [source](http://groupware.les.inf.puc-rio.br/har).
+
+The aim of the project is to predict the manner in which they did the exercise using a machine learning algorithm to predit it (variable *classe*).
+
+
+# Data Loading and Pre-Processing
+
+Data was doawnloaded to R working directory and loaded ([loadJML code](https://github.com/Jamamel/JamachineLearning/blob/master/R/load_0.R)).
+
+```{r}
+library(magrittr)
+library(data.table)
+dlist <- JamachineLearning::loadJML('./csvs/pml-training.csv', './csvs/pml-testing.csv')
+```
+
+Remove first 7 variables (id, window, timestamp) given they are considered redundant in the analysis. Transform *classe* to factor.
+
+```{r, results = 'hide'}
+d1 <- data.table::copy(dlist[[1]])
+d1[, c(1:7) := NULL, with = F]
+for(i in c('classe')) data.table::set(d1, j = i, value = factor(d1[[i]]))
+```
+
+Create data partition (60% training, 40% testing) of original training dataset.Remove variables with (up to nearly) no variance and any variables that have at least 97% of their values missing.
+
+```{r, results='hide', cache = TRUE}
+# partition dataset
+trainpart <- caret::createDataPartition(d1$classe, p = 0.6, list = FALSE)[,1]
+
+training <- d1[trainpart, ]
+testing <- d1[-trainpart, ]
+
+# check for near zero variance
+varcheck <- caret::nearZeroVar(training, saveMetrics = TRUE)
+outvars <- rownames(varcheck)[varcheck$nzv]
+if(isTRUE(length(outvars) > 0)) training[, outvars := NULL, with = F]
+
+
+# check for proportion of missing values
+nacount <- as.matrix(training[, lapply(.SD, function(x) sum(is.na(x)))])
+table(nacount)
+nacutoff <- min(nacount[nacount != 0])
+
+if(isTRUE(nacutoff/nrow(training) > 0.97)) {
+
+  outvars <- which(nacount >= nacutoff)
+  training[, outvars := NULL, with = F]
+
+}
+
+# apply common class to all numeric variables remaining
+vars <- unlist(sapply(training, function(x) class(x)[1]))
+numvars <- names(vars[vars %in% c('numeric', 'integer')])
+for(i in numvars) data.table::set(training, j = i, value = as.numeric(training[[i]]))
+```
+
+
+# Modelling and Cross-Validation
+
+A random forest algorithm is applied to identify the best prediction model using all *randomForest* default settings.
+
+```{r, results='hide'}
+set.seed(1000)
+moddata <- data.table::copy(training)
+mod <- randomForest::randomForest(classe ~ ., data = moddata)
+```
+
+Generate confusino matrix to measure accuracies.
+
+```{r}
+confmat <- caret::confusionMatrix(predict(mod, testing, type = 'class'), testing$classe)
+confmat
+```
+
+The confusion matrix confirms a highly accurate model (*Accuracy* = `r scales::percent(confmat$overall['Accuracy'])`) with acceptably low out-of-bag error (*OOB* = `r scales::percent(1 - confmat$overall['Accuracy'])`).
+
+
+# Validation and Submission
+
+The model was then validated against the project's training set.
+
+```{r, results='hide'}
+validating <- data.table::copy(dlist[[2]])
+validating[, 'V1' := as.numeric(V1)]
+data.table::setkey(validating, V1)
+for(i in numvars) data.table::set(validating, j = i, value = as.numeric(validating[[i]]))
+```
+
+The predicted values were then submitted for the project's submission.
+
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(predict(mod, newdata = validating[,colnames(moddata)[-53], with = F], type = 'class'))
+
+```
+
+
+# Appendix
+
+This is t he R setup required to run all code displayed.
+
+```{r}
+sessionInfo()
+```
+

@@ -38,6 +38,7 @@ mod <- randomForest::randomForest(classe ~ ., data = moddata)
 mod
 
 confmat <- caret::confusionMatrix(predict(mod, testing, type = 'class'), testing$classe)
+confmat
 scales::percent(1 - confmat$overall['Accuracy'])
 
 
